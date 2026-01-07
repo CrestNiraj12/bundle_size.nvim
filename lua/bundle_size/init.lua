@@ -24,7 +24,6 @@ M.cache = {
 }
 
 M._timer = nil
-M._last_drawn = ""
 M._redraw_timer = nil
 
 local function format_bytes(n)
