@@ -89,7 +89,11 @@ function M.refresh()
   local text = get_buf_text(buf)
   local raw = #text
   if raw > (M.opts.max_file_size_kb * 1024) then
+    M.cache.raw = raw
+    M.cache.gzip = nil
     M.cache.result = "raw (too big)"
+    request_redraw()
+    return
   end
 
   M.cache.raw = raw
@@ -141,9 +145,7 @@ function M.setup(opts)
 
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
     group = group,
-    callback = function()
-      vim.schedule(M.refresh_debounced)
-    end
+    callback = M.refresh_debounced
   })
 
   vim.schedule(M.refresh)
