@@ -117,7 +117,6 @@ function M.refresh()
 
   if not is_enabled_buffer(buf) then
     clear_buf_state(buf)
-    request_redraw()
     return
   end
 
@@ -241,7 +240,7 @@ function M.setup(opts)
       end
 
       local s = buf_state(buf)
-      s.result, s.raw, s.gzip, s.brotli = "", nil, nil, nil
+      s.result, s.raw, s.gzip, s.brotli, s.tick = "", nil, nil, nil, nil
       request_redraw()
     else
       for _, st in pairs(M.cache.by_buf) do
