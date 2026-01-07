@@ -1,4 +1,5 @@
 local M = {}
+local compute = require("bundle_size.compute")
 
 M.opts = {
   delay_ms = 200,
@@ -17,10 +18,14 @@ M.opts = {
 }
 
 M.cache = {
+  raw = nil,
+  gzip = nil,
   result = "raw ?",
 }
 
 M._timer = nil
+M._last_drawn = ""
+M._redraw_timer = nil
 
 local function format_bytes(n)
   local byte_size = 1024
@@ -48,6 +53,27 @@ local function is_enabled_buffer(buf)
   return true
 end
 
+local function build_result()
+  local parts = {}
+  if M.cache.raw then table.insert(parts, "raw " .. format_bytes(M.cache.raw)) else table.insert(parts, "raw ?") end
+  if M.cache.gzip then table.insert(parts, "gz " .. format_bytes(M.cache.gzip)) else table.insert(parts, "gz ?") end
+  return table.concat(parts, " | ")
+end
+
+local function request_redraw()
+  if M._redraw_timer then return end
+
+  M._redraw_timer = vim.uv.new_timer()
+  M._redraw_timer:start(50, 0, function()
+    M._redraw_timer:stop()
+    M._redraw_timer:close()
+    M._redraw_timer = nil
+    vim.schedule(function()
+      vim.cmd("redrawstatus")
+    end)
+  end)
+end
+
 function M.refresh()
   if vim.in_fast_event() then
     vim.schedule(M.refresh)
@@ -60,16 +86,33 @@ function M.refresh()
     return
   end
 
+  local tick = vim.b[buf].changedtick
   local text = get_buf_text(buf)
   local raw = #text
   if raw > (M.opts.max_file_size_kb * 1024) then
     M.cache.result = "raw (too big)"
-  else
-    M.cache.result = "raw " .. format_bytes(raw)
   end
 
-  vim.schedule(function()
-    vim.cmd("redrawstatus")
+  M.cache.raw = raw
+  M.cache.gzip = nil
+  local new_result = build_result()
+  if new_result ~= M.cache.result then
+    M.cache.result = new_result
+    request_redraw()
+  end
+
+  compute.gzip_size(text, function(gz)
+    vim.schedule(function()
+      if buf ~= vim.api.nvim_get_current_buf() then return end
+      if tick ~= vim.b[buf].changedtick then return end
+
+      M.cache.gzip = gz
+      local result = build_result()
+      if result ~= M.cache.result then
+        M.cache.result = result
+        request_redraw()
+      end
+    end)
   end)
 end
 
