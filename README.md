@@ -1,11 +1,12 @@
 # bundle_size.nvim
 
-Display the current buffer size (raw + gzip) in your statusline.
+Display the current buffer size (raw, gzip, brotli) in your statusline.
 
 This plugin computes:
 
 - **raw**: byte length of the current buffer text
 - **gz**: gzip-compressed byte length (requires `gzip` on your `$PATH`)
+- **br**: brotli-compressed byte length (requires `brotli` on your `$PATH`)
 
 The value is exposed via `require("bundle_size").status()` so you can show it in
 lualine, heirline, a custom statusline, etc.
@@ -14,6 +15,7 @@ lualine, heirline, a custom statusline, etc.
 
 - Neovim **0.10+** (uses `vim.system` and `vim.uv`)
 - Optional: `gzip` executable for gzip size (if missing, `gz ?` is shown)
+- Optional: `brotli` executable for brotli size (if missing, `br ?` is shown)
 
 ## Installation
 
@@ -38,6 +40,16 @@ use({
   end,
 })
 ```
+
+## Pros
+
+- **Instant feedback**: see raw/gzip/brotli sizes as you edit.
+- **Statusline-friendly**: a single `status()` function works with any
+  statusline plugin.
+- **Low overhead**: debounced updates + throttled redraw to reduce flicker.
+- **Safe on large files**: skips compression work past a size threshold.
+- **Async compression**: uses `vim.system()` to avoid blocking the UI.
+- **Configurable**: toggle metrics, separator, filetypes, and brotli quality.
 
 ## Usage
 

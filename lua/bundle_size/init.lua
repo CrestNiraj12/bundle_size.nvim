@@ -2,8 +2,12 @@ local M = {}
 local compute = require("bundle_size.compute")
 
 M.opts = {
+  enabled = true,
+  show = { raw = true, gzip = true, brotli = true },
   delay_ms = 200,
+  brotli_quality = 11,
   max_file_size_kb = 1024,
+  separator = "|",
   enabled_filetypes = {
     javascript = true,
     javascriptreact = true,
@@ -20,7 +24,9 @@ M.opts = {
 M.cache = {
   raw = nil,
   gzip = nil,
+  brotli = nil,
   result = "raw ?",
+  last_tick = {},
 }
 
 M._timer = nil
@@ -54,9 +60,20 @@ end
 
 local function build_result()
   local parts = {}
-  if M.cache.raw then table.insert(parts, "raw " .. format_bytes(M.cache.raw)) else table.insert(parts, "raw ?") end
-  if M.cache.gzip then table.insert(parts, "gz " .. format_bytes(M.cache.gzip)) else table.insert(parts, "gz ?") end
-  return table.concat(parts, " | ")
+
+  if M.opts.show.raw then
+    table.insert(parts, "raw " .. (M.cache.raw and format_bytes(M.cache.raw) or "?"))
+  end
+
+  if M.opts.show.gzip then
+    table.insert(parts, "gz " .. (M.cache.gzip and format_bytes(M.cache.gzip) or "?"))
+  end
+
+  if M.opts.show.brotli then
+    table.insert(parts, "br " .. (M.cache.brotli and format_bytes(M.cache.brotli) or "?"))
+  end
+
+  return table.concat(parts, " " .. M.opts.separator .. " ")
 end
 
 local function request_redraw()
@@ -79,10 +96,16 @@ function M.refresh()
     return
   end
 
+  if M.opts.enabled == false then
+    return
+  end
+
   local buf = vim.api.nvim_get_current_buf()
   if not is_enabled_buffer(buf) then
     M.cache.raw = nil
     M.cache.gzip = nil
+    M.cache.brotli = nil
+    M.cache.last_tick[buf] = nil
     if M.cache.result ~= "" then
       M.cache.result = ""
       request_redraw()
@@ -91,11 +114,17 @@ function M.refresh()
   end
 
   local tick = vim.b[buf].changedtick
+  if M.cache.last_tick[buf] == tick then
+    return
+  end
+
+  M.cache.last_tick[buf] = tick
   local text = get_buf_text(buf)
   local raw = #text
   if raw > (M.opts.max_file_size_kb * 1024) then
     M.cache.raw = raw
     M.cache.gzip = nil
+    M.cache.brotli = nil
     if M.cache.result ~= "raw (too big)" then
       M.cache.result = "raw (too big)"
       request_redraw()
@@ -105,26 +134,46 @@ function M.refresh()
 
   M.cache.raw = raw
   M.cache.gzip = nil
+  M.cache.brotli = nil
   local new_result = build_result()
   if new_result ~= M.cache.result then
     M.cache.result = new_result
     request_redraw()
   end
 
-  compute.gzip_size(text, function(gz)
-    vim.schedule(function()
-      if not vim.api.nvim_buf_is_valid(buf) then return end
-      if buf ~= vim.api.nvim_get_current_buf() then return end
-      if tick ~= vim.b[buf].changedtick then return end
+  if M.opts.show.gzip then
+    compute.gzip_size(text, function(gz)
+      vim.schedule(function()
+        if not vim.api.nvim_buf_is_valid(buf) then return end
+        if buf ~= vim.api.nvim_get_current_buf() then return end
+        if tick ~= vim.b[buf].changedtick then return end
 
-      M.cache.gzip = gz
-      local result = build_result()
-      if result ~= M.cache.result then
-        M.cache.result = result
-        request_redraw()
-      end
+        M.cache.gzip = gz
+        local result = build_result()
+        if result ~= M.cache.result then
+          M.cache.result = result
+          request_redraw()
+        end
+      end)
     end)
-  end)
+  end
+
+  if M.opts.show.brotli then
+    compute.brotli_size(text, function(br)
+      vim.schedule(function()
+        if not vim.api.nvim_buf_is_valid(buf) then return end
+        if buf ~= vim.api.nvim_get_current_buf() then return end
+        if tick ~= vim.b[buf].changedtick then return end
+
+        M.cache.brotli = br
+        local result = build_result()
+        if result ~= M.cache.result then
+          M.cache.result = result
+          request_redraw()
+        end
+      end)
+    end, M.opts.brotli_quality)
+  end
 end
 
 function M.refresh_debounced()
@@ -155,6 +204,20 @@ function M.setup(opts)
     group = group,
     callback = M.refresh_debounced
   })
+
+  vim.api.nvim_create_user_command("BundleSizeRefresh", function()
+    vim.schedule(M.refresh)
+  end, {})
+
+  vim.api.nvim_create_user_command("BundleSizeToggle", function()
+    M.opts.enabled = (M.opts.enabled ~= false) and false or true
+    if not M.opts.enabled then
+      M.cache.result = ""
+      request_redraw()
+    else
+      vim.schedule(M.refresh)
+    end
+  end, {})
 
   vim.schedule(M.refresh)
 end
