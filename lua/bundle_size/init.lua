@@ -22,15 +22,24 @@ M.opts = {
 }
 
 M.cache = {
-  raw = nil,
-  gzip = nil,
-  brotli = nil,
-  result = "raw ?",
-  last_tick = {},
+  by_buf = {},
 }
 
 M._timer = nil
 M._redraw_timer = nil
+
+local function buf_state(buf)
+  local s = M.cache.by_buf[buf]
+  if not s then
+    s = { raw = nil, gzip = nil, brotli = nil, result = "", tick = nil }
+    M.cache.by_buf[buf] = s
+  end
+  return s
+end
+
+local function clear_buf_state(buf)
+  M.cache.by_buf[buf] = nil
+end
 
 local function format_bytes(n)
   local byte_size = 1024
@@ -58,19 +67,17 @@ local function is_enabled_buffer(buf)
   return true
 end
 
-local function build_result()
+local function build_result(s)
   local parts = {}
 
   if M.opts.show.raw then
-    table.insert(parts, "raw " .. (M.cache.raw and format_bytes(M.cache.raw) or "?"))
+    table.insert(parts, "raw " .. (s.raw and format_bytes(s.raw) or "?"))
   end
-
   if M.opts.show.gzip then
-    table.insert(parts, "gz " .. (M.cache.gzip and format_bytes(M.cache.gzip) or "?"))
+    table.insert(parts, "gz " .. (s.gzip and format_bytes(s.gzip) or "?"))
   end
-
   if M.opts.show.brotli then
-    table.insert(parts, "br " .. (M.cache.brotli and format_bytes(M.cache.brotli) or "?"))
+    table.insert(parts, "br " .. (s.brotli and format_bytes(s.brotli) or "?"))
   end
 
   return table.concat(parts, " " .. M.opts.separator .. " ")
@@ -96,52 +103,51 @@ function M.refresh()
     return
   end
 
-  if M.opts.enabled == false then
-    if M.cache.result ~= "" then
-      M.cache.result = ""
-      request_redraw()
-    end
-    return
-  end
-
   local buf = vim.api.nvim_get_current_buf()
-  if not is_enabled_buffer(buf) then
-    M.cache.raw = nil
-    M.cache.gzip = nil
-    M.cache.brotli = nil
-    M.cache.last_tick[buf] = nil
-    if M.cache.result ~= "" then
-      M.cache.result = ""
+
+  if M.opts.enabled == false then
+    local s = buf_state(buf)
+    if s.result ~= "" then
+      s.result = ""
+      s.tick = nil
       request_redraw()
     end
     return
   end
 
-  local tick = vim.b[buf].changedtick
-  if M.cache.last_tick[buf] == tick then
+  if not is_enabled_buffer(buf) then
+    clear_buf_state(buf)
+    request_redraw()
     return
   end
 
-  M.cache.last_tick[buf] = tick
+  local s = buf_state(buf)
+  local tick = vim.b[buf].changedtick
+
+  if s.tick == tick and s.result ~= "" then
+    return
+  end
+  s.tick = tick
+
   local text = get_buf_text(buf)
   local raw = #text
+
   if raw > (M.opts.max_file_size_kb * 1024) then
-    M.cache.raw = raw
-    M.cache.gzip = nil
-    M.cache.brotli = nil
-    if M.cache.result ~= "raw (too big)" then
-      M.cache.result = "raw (too big)"
+    s.raw, s.gzip, s.brotli = raw, nil, nil
+    if s.result ~= "raw (too big)" then
+      s.result = "raw (too big)"
       request_redraw()
     end
     return
   end
 
-  M.cache.raw = raw
-  M.cache.gzip = nil
-  M.cache.brotli = nil
-  local new_result = build_result()
-  if new_result ~= M.cache.result then
-    M.cache.result = new_result
+  s.raw = raw
+  if M.opts.show.gzip then s.gzip = nil end
+  if M.opts.show.brotli then s.brotli = nil end
+
+  local new_result = build_result(s)
+  if new_result ~= s.result then
+    s.result = new_result
     request_redraw()
   end
 
@@ -152,10 +158,11 @@ function M.refresh()
         if buf ~= vim.api.nvim_get_current_buf() then return end
         if tick ~= vim.b[buf].changedtick then return end
 
-        M.cache.gzip = gz
-        local result = build_result()
-        if result ~= M.cache.result then
-          M.cache.result = result
+        local st = buf_state(buf)
+        st.gzip = gz
+        local r = build_result(st)
+        if r ~= st.result then
+          st.result = r
           request_redraw()
         end
       end)
@@ -169,10 +176,11 @@ function M.refresh()
         if buf ~= vim.api.nvim_get_current_buf() then return end
         if tick ~= vim.b[buf].changedtick then return end
 
-        M.cache.brotli = br
-        local result = build_result()
-        if result ~= M.cache.result then
-          M.cache.result = result
+        local st = buf_state(buf)
+        st.brotli = br
+        local r = build_result(st)
+        if r ~= st.result then
+          st.result = r
           request_redraw()
         end
       end)
@@ -209,19 +217,36 @@ function M.setup(opts)
     callback = M.refresh_debounced
   })
 
+  vim.api.nvim_create_autocmd("BufWipeout", {
+    group = group,
+    callback = function(args)
+      clear_buf_state(args.buf)
+    end,
+  })
+
   vim.api.nvim_create_user_command("BundleSizeRefresh", function()
     vim.schedule(M.refresh)
   end, {})
 
   vim.api.nvim_create_user_command("BundleSizeToggle", function()
     M.opts.enabled = (M.opts.enabled ~= false) and false or true
+
+    local buf = vim.api.nvim_get_current_buf()
+
     if not M.opts.enabled then
-      M.cache.raw = nil
-      M.cache.gzip = nil
-      M.cache.brotli = nil
-      M.cache.result = ""
+      if M._timer then
+        M._timer:stop()
+        M._timer:close()
+        M._timer = nil
+      end
+
+      local s = buf_state(buf)
+      s.result, s.raw, s.gzip, s.brotli = "", nil, nil, nil
       request_redraw()
     else
+      for _, st in pairs(M.cache.by_buf) do
+        st.tick = nil
+      end
       vim.schedule(M.refresh)
     end
   end, {})
@@ -230,7 +255,9 @@ function M.setup(opts)
 end
 
 function M.status()
-  return M.cache.result or ""
+  local buf = vim.api.nvim_get_current_buf()
+  local s = M.cache.by_buf[buf]
+  return (s and s.result) or ""
 end
 
 return M
