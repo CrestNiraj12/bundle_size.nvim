@@ -32,7 +32,14 @@ M._redraw_timer = nil
 local function buf_state(buf)
   local s = M.cache.by_buf[buf]
   if not s then
-    s = { raw = nil, gzip = nil, brotli = nil, result = "", tick = nil }
+    s = {
+      raw = nil,
+      gzip = nil,
+      brotli = nil,
+      result = "",
+      tick = nil,
+      loading = false,
+    }
     M.cache.by_buf[buf] = s
   end
   return s
@@ -81,7 +88,17 @@ local function build_result(s)
     table.insert(parts, "br " .. (s.brotli and format_bytes(s.brotli) or "?"))
   end
 
-  return table.concat(parts, " " .. M.opts.separator .. " ")
+  -- Show the last known values, but append a subtle loading indicator
+  -- while async compression sizes are being recomputed.
+  local result = table.concat(parts, " " .. M.opts.separator .. " ")
+  if s.loading then
+    if result == "" then
+      return "BundleSize: Refreshing…"
+    end
+    return result .. " " .. M.opts.separator .. " Refreshing…"
+  end
+
+  return result
 end
 
 local function request_redraw()
@@ -126,9 +143,12 @@ function M.refresh()
   local s = buf_state(buf)
   local tick = vim.b[buf].changedtick
 
-  if s.tick == tick and s.result ~= "" then
+  -- If the buffer hasn't changed and we're not currently waiting on any sizes,
+  -- keep the existing (already computed) display.
+  if s.tick == tick and s.result ~= "" and not s.loading then
     return
   end
+
   s.tick = tick
 
   local text = get_buf_text(buf)
@@ -144,13 +164,37 @@ function M.refresh()
   end
 
   s.raw = raw
-  if M.opts.show.gzip then s.gzip = nil end
-  if M.opts.show.brotli then s.brotli = nil end
+
+  -- Enter loading state while async sizes are being recomputed.
+  local pending = 0
+  if M.opts.show.gzip then
+    pending = pending + 1
+    s.gzip = nil
+  end
+  if M.opts.show.brotli then
+    pending = pending + 1
+    s.brotli = nil
+  end
+
+  s.loading = pending > 0
 
   local new_result = build_result(s)
   if new_result ~= s.result then
     s.result = new_result
     request_redraw()
+  end
+
+  local function done_one(st)
+    pending = pending - 1
+    if pending <= 0 then
+      st.loading = false
+    end
+
+    local r = build_result(st)
+    if r ~= st.result then
+      st.result = r
+      request_redraw()
+    end
   end
 
   if M.opts.show.gzip then
@@ -165,11 +209,7 @@ function M.refresh()
 
         local st = buf_state(buf)
         st.gzip = gz
-        local r = build_result(st)
-        if r ~= st.result then
-          st.result = r
-          request_redraw()
-        end
+        done_one(st)
       end)
     end)
   end
@@ -186,11 +226,7 @@ function M.refresh()
 
         local st = buf_state(buf)
         st.brotli = br
-        local r = build_result(st)
-        if r ~= st.result then
-          st.result = r
-          request_redraw()
-        end
+        done_one(st)
       end)
     end, M.opts.brotli_quality)
   end
@@ -233,31 +269,68 @@ function M.setup(opts)
   })
 
   vim.api.nvim_create_user_command("BundleSizeRefresh", function()
+    local buf = vim.api.nvim_get_current_buf()
+    local s = buf_state(buf)
+
+    -- Force a refresh even if unchangedtick didn't change.
+    s.tick = nil
+
+    -- Keep last known values, but show loading while recomputing.
+    s.loading = true
+    local r = build_result(s)
+    if r ~= s.result then
+      s.result = r
+      request_redraw()
+    end
+
     vim.schedule(M.refresh)
   end, {})
 
   vim.api.nvim_create_user_command("BundleSizeToggle", function()
     M._gen = M._gen + 1
-    M.opts.enabled = (M.opts.enabled ~= false) and false or true
 
-    local buf = vim.api.nvim_get_current_buf()
+    -- Disable
+    if M.opts.enabled ~= false then
+      M.opts.enabled = false
 
-    if not M.opts.enabled then
       if M._timer then
         M._timer:stop()
         M._timer:close()
         M._timer = nil
       end
 
-      local s = buf_state(buf)
-      s.result, s.raw, s.gzip, s.brotli, s.tick = "", nil, nil, nil, nil
+      -- Clear all cached state so status() returns empty and nothing is shown.
+      M.cache.by_buf = {}
       request_redraw()
-    else
-      for _, st in pairs(M.cache.by_buf) do
-        st.tick = nil
+
+      if not vim.g.bundle_size_silent_toggle then
+        pcall(vim.notify, "BundleSize: disabled", vim.log.levels.INFO)
       end
-      vim.schedule(M.refresh)
+      return
     end
+
+    -- Enable
+    M.opts.enabled = true
+
+    local buf = vim.api.nvim_get_current_buf()
+    local s = buf_state(buf)
+
+    -- Force a refresh even if unchangedtick didn't change.
+    s.tick = nil
+
+    -- Show loading while recomputing.
+    s.loading = true
+    local r = build_result(s)
+    if r ~= s.result then
+      s.result = r
+      request_redraw()
+    end
+
+    if not vim.g.bundle_size_silent_toggle then
+      pcall(vim.notify, "BundleSize: enabled", vim.log.levels.INFO)
+    end
+
+    vim.schedule(M.refresh)
   end, {})
 
   vim.schedule(M.refresh)
