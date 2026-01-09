@@ -1,10 +1,10 @@
 local M = {}
 
-local buf = require("bundle_size.buf")
-local compute = require("bundle_size.compute")
-local redraw = require("bundle_size.redraw")
-local render = require("bundle_size.render")
-local state = require("bundle_size.state")
+local buf = require("compress_size.buf")
+local compute = require("compress_size.compute")
+local redraw = require("compress_size.redraw")
+local render = require("compress_size.render")
+local state = require("compress_size.state")
 
 M.opts = {
   enabled = true,
@@ -241,7 +241,7 @@ function M.setup(opts)
       M.cache.by_buf = {}
       request_redraw()
 
-      if not vim.g.bundle_size_silent_toggle then
+      if not vim.g.compress_size_silent_toggle then
         pcall(vim.notify, "BundleSize: disabled", vim.log.levels.INFO)
       end
       return
@@ -264,7 +264,7 @@ function M.setup(opts)
       request_redraw()
     end
 
-    if not vim.g.bundle_size_silent_toggle then
+    if not vim.g.compress_size_silent_toggle then
       pcall(vim.notify, "BundleSize: enabled", vim.log.levels.INFO)
     end
 

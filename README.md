@@ -1,4 +1,4 @@
-# bundle-size.nvim
+# compress-size.nvim
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Neovim Version](https://img.shields.io/badge/Neovim-0.10+-blue.svg)](https://neovim.io/)
@@ -22,7 +22,7 @@ This plugin computes and displays:
 
 ```lua
 {
-  "CrestNiraj12/bundle-size.nvim",
+  "CrestNiraj12/compress-size.nvim",
   opts = {
     -- your config here (see Options)
   },
@@ -33,22 +33,22 @@ This plugin computes and displays:
 
 ```lua
 use({
-  "CrestNiraj12/bundle-size.nvim",
+  "CrestNiraj12/compress-size.nvim",
   config = function()
-    require("bundle_size").setup()
+    require("compress_size").setup()
   end,
 })
 ```
 
 ## Usage
 
-1. Call `require("bundle_size").setup()` in your init.lua.
+1. Call `require("compress_size").setup()` in your init.lua.
 2. Add the status function to your statusline.
 
 ### Minimal Setup
 
 ```lua
-require("bundle_size").setup()
+require("compress_size").setup()
 ```
 
 ### Integrate with Statusline
@@ -61,7 +61,7 @@ require("lualine").setup({
     lualine_c = {
       "filename",
       function()
-        return require("bundle_size").status()
+        return require("compress_size").status()
       end,
     },
   },
@@ -71,12 +71,12 @@ require("lualine").setup({
 #### Custom Statusline
 
 ```lua
-require("bundle_size").setup()
+require("compress_size").setup()
 
 vim.o.statusline = table.concat({
   "%f",
   "%=",
-  "%{v:lua.require('bundle_size').status()}",
+  "%{v:lua.require('compress_size').status()}",
 }, " ")
 ```
 

@@ -1,4 +1,4 @@
-local F = require("bundle_size.format")
+local F = require("compress_size.format")
 
 local R = {}
 
