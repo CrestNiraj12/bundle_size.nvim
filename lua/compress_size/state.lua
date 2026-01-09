@@ -1,6 +1,6 @@
 local S = {}
 
----@class BundleSizeBufferState
+---@class CompressSizeBufferState
 ---@field raw? integer
 ---@field gzip? integer
 ---@field brotli? integer
@@ -8,12 +8,12 @@ local S = {}
 ---@field tick? integer
 ---@field loading boolean
 
----@class BundleSizeCache
----@field by_buf table<integer, BundleSizeBufferState>
+---@class CompressSizeCache
+---@field by_buf table<integer, CompressSizeBufferState>
 
----@param cache BundleSizeCache
+---@param cache CompressSizeCache
 ---@param buf integer
----@return BundleSizeBufferState
+---@return CompressSizeBufferState
 function S.get(cache, buf)
   local s = cache.by_buf[buf]
   if not s then
@@ -30,13 +30,13 @@ function S.get(cache, buf)
   return s
 end
 
----@param cache BundleSizeCache
+---@param cache CompressSizeCache
 ---@param buf integer
 function S.clear(cache, buf)
   cache.by_buf[buf] = nil
 end
 
----@param cache BundleSizeCache
+---@param cache CompressSizeCache
 function S.clear_all(cache)
   cache.by_buf = {}
 end

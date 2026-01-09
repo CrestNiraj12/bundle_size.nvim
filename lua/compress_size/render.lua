@@ -2,12 +2,12 @@ local F = require("compress_size.format")
 
 local R = {}
 
----@class BundleSizeRenderOpts
+---@class CompressSizeRenderOpts
 ---@field show { raw: boolean, gzip: boolean, brotli: boolean }
 ---@field separator string
 
----@param opts BundleSizeRenderOpts
----@param s BundleSizeBufferState
+---@param opts CompressSizeRenderOpts
+---@param s CompressSizeBufferState
 ---@return string
 function R.build_result(opts, s)
   local parts = {}
@@ -27,7 +27,7 @@ function R.build_result(opts, s)
   local result = table.concat(parts, " " .. opts.separator .. " ")
   if s.loading then
     if result == "" then
-      return "BundleSize: Refreshing…"
+      return "CompressSize: Refreshing…"
     end
     return result .. " " .. opts.separator .. " Refreshing…"
   end

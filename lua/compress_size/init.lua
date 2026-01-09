@@ -185,7 +185,7 @@ end
 
 function M.setup(opts)
   M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
-  local group = vim.api.nvim_create_augroup("BundleSize", { clear = true })
+  local group = vim.api.nvim_create_augroup("CompressSize", { clear = true })
 
   vim.api.nvim_create_autocmd({ "BufEnter", "BufWritePost" }, {
     group = group,
@@ -206,7 +206,7 @@ function M.setup(opts)
     end,
   })
 
-  vim.api.nvim_create_user_command("BundleSizeRefresh", function()
+  vim.api.nvim_create_user_command("CompressSizeRefresh", function()
     local cur_buf = vim.api.nvim_get_current_buf()
     local s = buf_state(cur_buf)
 
@@ -224,7 +224,7 @@ function M.setup(opts)
     vim.schedule(M.refresh)
   end, {})
 
-  vim.api.nvim_create_user_command("BundleSizeToggle", function()
+  vim.api.nvim_create_user_command("CompressSizeToggle", function()
     M._gen = M._gen + 1
 
     -- Disable
@@ -242,7 +242,7 @@ function M.setup(opts)
       request_redraw()
 
       if not vim.g.compress_size_silent_toggle then
-        pcall(vim.notify, "BundleSize: disabled", vim.log.levels.INFO)
+        pcall(vim.notify, "CompressSize: disabled", vim.log.levels.INFO)
       end
       return
     end
@@ -265,7 +265,7 @@ function M.setup(opts)
     end
 
     if not vim.g.compress_size_silent_toggle then
-      pcall(vim.notify, "BundleSize: enabled", vim.log.levels.INFO)
+      pcall(vim.notify, "CompressSize: enabled", vim.log.levels.INFO)
     end
 
     vim.schedule(M.refresh)

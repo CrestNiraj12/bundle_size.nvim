@@ -118,8 +118,8 @@ Pass options to `setup()`. Defaults:
 
 ## Commands
 
-- `:BundleSizeRefresh` — Force recompute sizes and show "Refreshing…" indicator.
-- `:BundleSizeToggle` — Toggle the plugin on/off. When off, statusline shows nothing.
+- `:CompressSizeRefresh` — Force recompute sizes and show "Refreshing…" indicator.
+- `:CompressSizeToggle` — Toggle the plugin on/off. When off, statusline shows nothing.
 
 ### Silent Toggle
 

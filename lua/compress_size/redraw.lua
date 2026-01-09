@@ -1,9 +1,9 @@
 local D = {}
 
----@class BundleSizeRedraw
+---@class CompressSizeRedraw
 ---@field _timer? uv.uv_timer_t
 
----@param self BundleSizeRedraw
+---@param self CompressSizeRedraw
 function D:request()
   if self._timer then return end
 
