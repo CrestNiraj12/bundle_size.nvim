@@ -7,7 +7,7 @@ function B.get_text(buf)
   return table.concat(lines, "\n")
 end
 
----@param opts { enabled_filetypes?: table<string, boolean> }
+---@param opts { enabled_filetypes?: '*' | table<string, boolean> }
 ---@param buf? integer
 ---@return boolean
 function B.is_enabled_buffer(opts, buf)
@@ -16,14 +16,16 @@ function B.is_enabled_buffer(opts, buf)
   if vim.bo[buf].buftype ~= "" then return false end
   if vim.bo[buf].modifiable == false then return false end
 
+  -- If '*', enable all; if table, check specific; else disable
   local allow = opts.enabled_filetypes
-  if allow and next(allow) ~= nil then
+  if allow == '*' then return true end
+
+  if type(allow) == "table" then
     local ft = vim.bo[buf].filetype
     return allow[ft] == true
   end
 
-  return true
+  return false
 end
 
 return B
-

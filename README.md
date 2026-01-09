@@ -92,17 +92,17 @@ Pass options to `setup()`. Defaults:
   brotli_quality = 11,
   max_file_size_kb = 1024,
   separator = "|",
-  enabled_filetypes = {
-    javascript = true,
-    javascriptreact = true,
-    typescript = true,
-    typescriptreact = true,
-    css = true,
-    scss = true,
-    html = true,
-    json = true,
-    lua = true,
-  },
+  enabled_filetypes = '*',
+}
+```
+
+Example: To enable only for specific filetypes, set:
+
+```lua
+enabled_filetypes = {
+  lua = true,
+  javascript = true,
+  typescript = true,
 }
 ```
 
@@ -114,7 +114,7 @@ Pass options to `setup()`. Defaults:
 - `brotli_quality` (number): Compression quality for brotli (1-11).
 - `max_file_size_kb` (number): Max buffer size in KB before skipping compression.
 - `separator` (string): Separator between metrics in statusline.
-- `enabled_filetypes` (table): Map of filetype -> boolean for which files to process.
+- `enabled_filetypes` (`'*'` | table): Either `'*'` to enable for all filetypes, or a map of filetype -> boolean for specific filetypes to process.
 
 ## Commands
 

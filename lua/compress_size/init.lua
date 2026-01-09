@@ -13,17 +13,7 @@ M.opts = {
   brotli_quality = 11,
   max_file_size_kb = 1024,
   separator = "|",
-  enabled_filetypes = {
-    javascript = true,
-    javascriptreact = true,
-    typescript = true,
-    typescriptreact = true,
-    css = true,
-    scss = true,
-    html = true,
-    json = true,
-    lua = true,
-  },
+  enabled_filetypes = '*',
 }
 
 M.cache = {
